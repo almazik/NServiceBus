@@ -1,1 +1,1 @@
-.\tools\nant\nant.exe -D:targetframework=net-4.0
+.\tools\nant\nant.exe -D:targetframework=net-4.0 -D:include.dependencies=false

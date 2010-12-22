@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <project name="NServiceBus" default="build" xmlns="http://nant.sf.net/release/0.85/nant.xsd">
   <property name="solution.dir" value="src"/>
   <property name="trunk.dir" value="."/>
@@ -156,7 +156,7 @@
       <attributes>
         <attribute type="AssemblyVersionAttribute" value="${project.fullversion}" />
         <attribute type="AssemblyFileVersionAttribute" value="${project.fullversion}" />
-        <attribute type="AssemblyCopyrightAttribute" value="Copyright Â© ${company.name} 2007-${datetime::get-year(datetime::now())}" />
+        <attribute type="AssemblyCopyrightAttribute" value="Copyright © ${company.name} 2007-${datetime::get-year(datetime::now())}" />
         <attribute type="AssemblyProductAttribute" value="${project::get-name()}" />
         <attribute type="AssemblyCompanyAttribute" value="${company.name}" />
         <attribute type="AssemblyConfigurationAttribute" value="${project.config}" />
@@ -342,7 +342,7 @@
 				commandline="/p:Configuration=${project.config} ${msbuild.targetframework} /p:OutDir=${build.dir.absolutepath}\testing\"
 				workingdir="${solution.dir}\testing" />
 
-    
+   
     <mkdir 	dir="${output.dir}\testing" />
     <exec 	program="${lib.dir}\ilmerge.exe"
 				commandline="/out:${output.dir}\testing\NServiceBus.Testing.dll ${build.base}\testing\NServiceBus.Testing.dll ${build.base}\testing\Rhino.Mocks.dll /target:library /xmldocs /internalize:ilmerge.exclude /keyfile:NServiceBus.snk /log:build\output_testing.txt ${ilmerge.targetframework}"

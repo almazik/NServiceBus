@@ -14,7 +14,7 @@ namespace Timeout.MessageHandlers
     {
         void IWantCustomInitialization.Init()
         {
-            var configure = NServiceBus.Configure.With().DefaultBuilder();
+            var configure = NServiceBus.Configure.With().Autofac2Builder();
 
             string nameSpace = ConfigurationManager.AppSettings["NameSpace"];
             string serialization = ConfigurationManager.AppSettings["Serialization"];

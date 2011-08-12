@@ -95,7 +95,12 @@ namespace NServiceBus.Saga
         /// <param name="withState"></param>
         protected void RequestTimeout(DateTime at, object withState)
         {
-            RequestTimeout(at - DateTime.UtcNow, withState);
+            at = at.ToUniversalTime();
+
+            if (at <= DateTime.UtcNow)
+                Timeout(withState);
+            else
+                Bus.Send(new TimeoutMessage(at, Data, withState));
         }
 
         /// <summary>
@@ -106,10 +111,7 @@ namespace NServiceBus.Saga
         /// <param name="withState"></param>
         protected void RequestTimeout(TimeSpan within, object withState)
         {
-            if (within <= TimeSpan.Zero)
-                Timeout(withState);
-            else
-                Bus.Send(new TimeoutMessage(within, Data, withState));
+            RequestTimeout(DateTime.UtcNow + within, withState);
         }
 
         /// <summary>

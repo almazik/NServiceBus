@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading;
+using Common.Logging;
 using NServiceBus;
 using NServiceBus.Saga;
 using System.Transactions;
@@ -8,7 +9,9 @@ namespace Timeout.MessageHandlers
 {
     public class Bootstrapper : IWantToRunAtStartup
     {
-        public IPersistTimeouts Persister { get; set; }
+		private static readonly ILog _log = LogManager.GetCurrentClassLogger();
+		
+		public IPersistTimeouts Persister { get; set; }
         public IManageTimeouts Manager { get; set; }
         public IBus Bus { get; set; }
 
@@ -25,6 +28,8 @@ namespace Timeout.MessageHandlers
                             Bus.Send(e.Destination,
                                      new TimeoutMessage {SagaId = e.SagaId, Expires = e.Time, State = e.State});
                             Persister.Remove(e.SagaId);
+
+							_log.DebugFormat("Timeout message sent: SagaId={0}, Expires={1}, State={2}, Sender={3}", e.SagaId, e.Time, e.State, e.Destination);
 
                             scope.Complete();
                         }

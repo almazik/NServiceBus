@@ -2,99 +2,112 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Common.Logging;
 
 namespace Timeout.MessageHandlers
 {
-    /// <summary>
-    /// Thread-safe timeout management class.
-    /// </summary>
-    public class TimeoutManager : IManageTimeouts
-    {
-        public event EventHandler<TimeoutData> SagaTimedOut;
+	/// <summary>
+	/// Thread-safe timeout management class.
+	/// </summary>
+	public class TimeoutManager : IManageTimeouts
+	{
+		private static readonly ILog _log = LogManager.GetCurrentClassLogger();
 
-        public void Init(TimeSpan interval)
-        {
-            duration = interval;
-        }
-        void IManageTimeouts.PushTimeout(TimeoutData timeout)
-        {
-            lock (data)
-            {
-                if (!data.ContainsKey(timeout.Time))
-                    data[timeout.Time] = new List<TimeoutData>();
+		public event EventHandler<TimeoutData> SagaTimedOut;
 
-                data[timeout.Time].Add(timeout);
+		public void Init(TimeSpan interval)
+		{
+			duration = interval;
+		}
+		void IManageTimeouts.PushTimeout(TimeoutData timeout)
+		{
+			lock (data)
+			{
+				if (!data.ContainsKey(timeout.Time))
+					data[timeout.Time] = new List<TimeoutData>();
 
-                if (!sagaLookup.ContainsKey(timeout.SagaId))
-                    sagaLookup[timeout.SagaId] = new List<DateTime>();
+				data[timeout.Time].Add(timeout);
 
-                sagaLookup[timeout.SagaId].Add(timeout.Time);
-            }
-        }
+				if (!sagaLookup.ContainsKey(timeout.SagaId))
+					sagaLookup[timeout.SagaId] = new List<DateTime>();
 
-        void IManageTimeouts.PopTimeout()
-        {
-            var pair = new KeyValuePair<DateTime, List<TimeoutData>>(DateTime.MinValue, null);
+				sagaLookup[timeout.SagaId].Add(timeout.Time);
+			}
+		}
 
-            lock (data)
-            {
-                if (data.Count > 0)
-                {
-                    var next = data.ElementAt(0);
-                    if (next.Key - DateTime.UtcNow < duration)
-                    {
-                        pair = next;
-                        data.Remove(pair.Key);
+		void IManageTimeouts.PopTimeout()
+		{
+			var pair = new KeyValuePair<DateTime, List<TimeoutData>>(DateTime.MinValue, null);
 
-                        pair.Value.ForEach(td => sagaLookup.Remove(td.SagaId));
-                    }
-                }
-            }
+			lock (data)
+			{
+				if (data.Count > 0)
+				{
+					var next = data.ElementAt(0);
+					if (next.Key - DateTime.UtcNow < duration)
+					{
+						pair = next;
+						data.Remove(pair.Key);
 
-            if (pair.Key == DateTime.MinValue)
-            {
-                Thread.Sleep(duration);
-                return;
-            }
+						pair.Value.ForEach(td =>
+						{
+							List<DateTime> times;
+							if (!sagaLookup.TryGetValue(td.SagaId, out times))
+								return;
 
-            if (pair.Key > DateTime.UtcNow)
-                Thread.Sleep(pair.Key - DateTime.UtcNow);
+							times.Remove(td.Time);
+							if (times.Count == 0)
+								sagaLookup.Remove(td.SagaId);
+						});
+					}
+				}
+			}
 
-            pair.Value.ForEach(OnSagaTimedOut);
-        }
+			if (pair.Key == DateTime.MinValue)
+			{
+				Thread.Sleep(duration);
+				return;
+			}
 
-        void IManageTimeouts.ClearTimeout(Guid sagaId)
-        {
-            lock(data)
-            {
-                if (!sagaLookup.ContainsKey(sagaId))
-                    return;
+			if (pair.Key > DateTime.UtcNow)
+				Thread.Sleep(pair.Key - DateTime.UtcNow);
 
-                var times = sagaLookup[sagaId];
+			pair.Value.ForEach(OnSagaTimedOut);
+		}
 
-                sagaLookup.Remove(sagaId);
+		void IManageTimeouts.ClearTimeout(Guid sagaId)
+		{
+			lock (data)
+			{
+				List<DateTime> times;
+				if (!sagaLookup.TryGetValue(sagaId, out times))
+					return;
 
-                foreach (var time in times)
-                {
-                    foreach (var td in data[time].ToArray())
-                        if (td.SagaId == sagaId)
-                            data[time].Remove(td);
+				sagaLookup.Remove(sagaId);
 
-                    if (data[time].Count == 0)
-                        data.Remove(time);
-                }
-            }
-        }
+				foreach (var time in times)
+				{
+					List<TimeoutData> timeoutDatas = data[time];
 
-        private void OnSagaTimedOut(TimeoutData timeoutData)
-        {
-            if (SagaTimedOut != null)
-                SagaTimedOut(null, timeoutData);
-        }
+					timeoutDatas.RemoveAll(td => td.SagaId == sagaId);
 
-        private readonly SortedDictionary<DateTime, List<TimeoutData>> data = new SortedDictionary<DateTime, List<TimeoutData>>();
-        private readonly Dictionary<Guid, List<DateTime>> sagaLookup = new Dictionary<Guid, List<DateTime>>();
+					if (timeoutDatas.Count == 0)
+						data.Remove(time);
+				}
+			}
+		}
 
-        private TimeSpan duration = TimeSpan.FromMilliseconds(100);
-    }
+		private void OnSagaTimedOut(TimeoutData timeoutData)
+		{
+			_log.DebugFormat("Timeout fired: SagaId={0}, Expires={1}, State={2}, Sender={3}", timeoutData.SagaId, timeoutData.Time, timeoutData.State, timeoutData.Destination);
+
+			if (SagaTimedOut != null)
+				SagaTimedOut(null, timeoutData);
+		}
+
+		private readonly SortedDictionary<DateTime, List<TimeoutData>> data = new SortedDictionary<DateTime, List<TimeoutData>>();
+		private readonly Dictionary<Guid, List<DateTime>> sagaLookup = new Dictionary<Guid, List<DateTime>>();
+
+		private TimeSpan duration = TimeSpan.FromMilliseconds(100);
+	}
 }

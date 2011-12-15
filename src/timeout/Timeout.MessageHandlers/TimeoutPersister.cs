@@ -6,90 +6,92 @@ using NServiceBus.Utils;
 
 namespace Timeout.MessageHandlers
 {
-    public class TimeoutPersister : IPersistTimeouts
-    {
-        public string Queue
-        {
-            get { return q; } 
-            set { q = value; Init(value); }
-        }
-        private string q;
+	public class TimeoutPersister : IPersistTimeouts
+	{
+		public string Queue
+		{
+			get { return q; }
+			set { q = value; Init(value); }
+		}
+		private string q;
 
-        private void Init(string queue)
-        {
-            MsmqUtilities.CreateQueueIfNecessary(queue);
+		private void Init(string queue)
+		{
+			MsmqUtilities.CreateQueueIfNecessary(queue);
 
-            var path = MsmqUtilities.GetFullPath(queue);
+			var path = MsmqUtilities.GetFullPath(queue);
 
-            var mq = new MessageQueue(path);
+			var mq = new MessageQueue(path);
 
-            if (!mq.Transactional)
-                throw new Exception("Queue must be transactional.");
+			if (!mq.Transactional)
+				throw new Exception("Queue must be transactional.");
 
-            storageQueue = mq;
+			storageQueue = mq;
 
-            storageQueue.Formatter = new XmlMessageFormatter(new[] {typeof (TimeoutData)});
+			storageQueue.Formatter = new XmlMessageFormatter(new[] { typeof(TimeoutData) });
 
-            storageQueue.GetAllMessages().ToList().ForEach(
-                m =>
-                   {
-                       var td = m.Body as TimeoutData;
-                       if (td == null) //get rid of message
-                           storageQueue.ReceiveById(m.Id, MessageQueueTransactionType.Single);
-                       else //put into lookup
-                       {
-                           if (!sagaToMessageIdLookup.ContainsKey(td.SagaId))
-                               sagaToMessageIdLookup[td.SagaId] = new List<string>();
+			storageQueue.GetAllMessages().ToList().ForEach(
+				m =>
+				{
+					var td = m.Body as TimeoutData;
+					if (td == null) //get rid of message
+						storageQueue.ReceiveById(m.Id, MessageQueueTransactionType.Single);
+					else //put into lookup
+					{
+						if (!sagaToMessageIdLookup.ContainsKey(td.SagaId))
+							sagaToMessageIdLookup[td.SagaId] = new List<string>();
 
-                           sagaToMessageIdLookup[td.SagaId].Add(m.Id);
-                       }
-                   });
-        }
+						sagaToMessageIdLookup[td.SagaId].Add(m.Id);
+					}
+				});
+		}
 
-        IEnumerable<TimeoutData> IPersistTimeouts.GetAll()
-        {
-            return from m in storageQueue.GetAllMessages() where m.Body is TimeoutData select m.Body as TimeoutData;
-        }
+		IEnumerable<TimeoutData> IPersistTimeouts.GetAll()
+		{
+			return from m in storageQueue.GetAllMessages() where m.Body is TimeoutData select m.Body as TimeoutData;
+		}
 
-        void IPersistTimeouts.Add(TimeoutData timeout)
-        {
-            var msg = new Message
-                        {
-                            Body = timeout,
-                            Label = timeout.SagaId.ToString()
-                        };
+		void IPersistTimeouts.Add(TimeoutData timeout)
+		{
+			var msg = new Message
+						{
+							Body = timeout,
+							Label = timeout.SagaId.ToString()
+						};
 
-            storageQueue.Send(msg, MessageQueueTransactionType.Automatic);
+			storageQueue.Send(msg, MessageQueueTransactionType.Automatic);
 
-            lock (sagaToMessageIdLookup)
-            {
-                if (!sagaToMessageIdLookup.ContainsKey(timeout.SagaId))
-                    sagaToMessageIdLookup[timeout.SagaId] = new List<string>();
+			lock (sagaToMessageIdLookup)
+			{
+				if (!sagaToMessageIdLookup.ContainsKey(timeout.SagaId))
+					sagaToMessageIdLookup[timeout.SagaId] = new List<string>();
 
-                sagaToMessageIdLookup[timeout.SagaId].Add(msg.Id);
-            }
-        }
+				sagaToMessageIdLookup[timeout.SagaId].Add(msg.Id);
+			}
+		}
 
-        void IPersistTimeouts.Remove(Guid sagaId)
-        {
-            lock (sagaToMessageIdLookup)
-                if (sagaToMessageIdLookup.ContainsKey(sagaId))
-                {
-                    var ids = sagaToMessageIdLookup[sagaId];
+		void IPersistTimeouts.Remove(Guid sagaId)
+		{
+			lock (sagaToMessageIdLookup)
+			{
+				List<string> ids;
+				if (!sagaToMessageIdLookup.TryGetValue(sagaId, out ids))
+					return;
 
-                    foreach(var msgId in ids)
-                        try
-                        {
-                            storageQueue.ReceiveById(msgId, MessageQueueTransactionType.Automatic);
-                        }
-                        catch(InvalidOperationException) //msg ID not in queue
-                        {}
+				foreach (var msgId in ids)
+					try
+					{
+						storageQueue.ReceiveById(msgId, MessageQueueTransactionType.Automatic);
+					}
+					catch (InvalidOperationException) //msg ID not in queue
+					{
+					}
 
-                    sagaToMessageIdLookup.Remove(sagaId);
-                }
-        }
+				sagaToMessageIdLookup.Remove(sagaId);
+			}
+		}
 
-        private MessageQueue storageQueue;
-        private readonly Dictionary<Guid, List<string>> sagaToMessageIdLookup = new Dictionary<Guid, List<string>>();
-    }
+		private MessageQueue storageQueue;
+		private readonly Dictionary<Guid, List<string>> sagaToMessageIdLookup = new Dictionary<Guid, List<string>>();
+	}
 }

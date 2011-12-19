@@ -99,7 +99,7 @@ namespace Timeout.MessageHandlers
 
 		private void OnSagaTimedOut(TimeoutData timeoutData)
 		{
-			_log.DebugFormat("Timeout fired: SagaId={0}, Expires={1}, State={2}, Sender={3}", timeoutData.SagaId, timeoutData.Time, timeoutData.State, timeoutData.Destination);
+			_log.DebugFormat("Timeout fired: SagaId={0}, Expires={1}, State={2}, Sender={3}", timeoutData.SagaId, timeoutData.Time.ToString("u"), timeoutData.State, timeoutData.Destination);
 
 			if (SagaTimedOut != null)
 				SagaTimedOut(null, timeoutData);

@@ -29,7 +29,7 @@ namespace Timeout.MessageHandlers
                                      new TimeoutMessage {SagaId = e.SagaId, Expires = e.Time, State = e.State});
                             Persister.Remove(e.SagaId);
 
-							_log.DebugFormat("Timeout message sent: SagaId={0}, Expires={1}, State={2}, Sender={3}", e.SagaId, e.Time, e.State, e.Destination);
+							_log.DebugFormat("Timeout message sent: SagaId={0}, Expires={1}, State={2}, Sender={3}", e.SagaId, e.Time.ToString("u"), e.State, e.Destination);
 
                             scope.Complete();
                         }

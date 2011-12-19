@@ -30,7 +30,7 @@ namespace Timeout.MessageHandlers
                                    Time = message.Expires
                                };
 
-				_log.DebugFormat("Received TimoutMessage: SagaId={0}, Expires={1}, State={2}, Sender={3}", data.SagaId, data.Time, data.State, data.Destination);
+				_log.DebugFormat("Received TimoutMessage: SagaId={0}, Expires={1}, State={2}, Sender={3}", data.SagaId, data.Time.ToString("u"), data.State, data.Destination);
 				
 				Manager.PushTimeout(data);
                 Persister.Add(data);

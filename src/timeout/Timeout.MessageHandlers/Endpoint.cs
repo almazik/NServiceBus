@@ -10,7 +10,7 @@ namespace Timeout.MessageHandlers
     /// <summary>
     /// Configures the timeout host.
     /// </summary>
-    public class Endpoint : IConfigureThisEndpoint, AsA_Server, IWantCustomInitialization, ISpecifyMessageHandlerOrdering
+    public class Endpoint : IConfigureThisEndpoint, AsA_Server, IWantCustomInitialization, ISpecifyMessageHandlerOrdering, IWantCustomLogging
     {
         void IWantCustomInitialization.Init()
         {
@@ -40,5 +40,10 @@ namespace Timeout.MessageHandlers
         {
             order.Specify(First<TimeoutMessageHandler>.Then<SagaMessageHandler>());
         }
+
+    	public void Init()
+    	{
+    		//Will be declared in configuration
+    	}
     }
 }
